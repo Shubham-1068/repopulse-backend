@@ -127,7 +127,7 @@ public class AnalysisService {
         healthScore -= unmergedClosedPRs * 2;
 
         analysis.setHealthScore(Math.max(0, healthScore));
-        analysis.setAnalyzedAt(java.time.LocalDateTime.now());
+        analysis.setAnalyzedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
 
         try {
             OpenRouter aiResponse = openRouterService.generateRecommendation(analysis);
