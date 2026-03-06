@@ -18,6 +18,9 @@ public class GoogleAuthService {
 
     public String verify(String idTokenString) throws Exception {
 
+        System.out.println("ClientId = " + clientId);
+        System.out.println("Token prefix = " + idTokenString.substring(0,15));
+
         if (idTokenString == null || idTokenString.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing Google ID token");
         }
