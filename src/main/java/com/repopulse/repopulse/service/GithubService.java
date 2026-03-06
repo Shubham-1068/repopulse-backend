@@ -41,6 +41,8 @@ public class GithubService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Accept", "application/vnd.github+json");
+        headers.set("X-GitHub-Api-Version", "2022-11-28");
+        headers.set("User-Agent", "RepoPulse-Backend");
 
         if (token != null && !token.isBlank()) {
             headers.setBearerAuth(token);
@@ -55,9 +57,16 @@ public class GithubService {
             return response.getBody();
         } catch (HttpStatusCodeException ex) {
             String message = ex.getResponseBodyAsString();
+            String reason = "GitHub API request failed: " + message;
+
+            if (ex.getStatusCode().value() == 403 && (token == null || token.isBlank())) {
+            reason = "GitHub API returned 403 (likely rate limit for unauthenticated requests). " +
+                "Provide a GitHub token in the request token field. Upstream: " + message;
+            }
+
             throw new ResponseStatusException(
                 ex.getStatusCode(),
-                "GitHub API request failed: " + message,
+                reason,
                 ex
             );
         } catch (Exception ex) {

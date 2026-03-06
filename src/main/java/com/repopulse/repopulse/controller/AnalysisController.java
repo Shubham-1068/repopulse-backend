@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/analyze")
-@CrossOrigin(origins = "*")
 public class AnalysisController {
     private final AnalysisService service;
 
