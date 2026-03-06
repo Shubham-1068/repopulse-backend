@@ -8,7 +8,10 @@ import com.repopulse.repopulse.entity.RepoAnalysis;
 import com.repopulse.repopulse.entity.User;
 import com.repopulse.repopulse.repository.Report;
 import com.repopulse.repopulse.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -34,7 +37,11 @@ public class AnalysisService {
     public RepoAnalysis analyze(AnalysisRequest req, String authHeader) throws Exception {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Missing or invalid Authorization header");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
+        }
+
+        if (req == null || req.getRepoName() == null || req.getRepoName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "repoName is required");
         }
 
         String googleToken = authHeader.replace("Bearer ", "");
@@ -47,7 +54,7 @@ public class AnalysisService {
                     return userRepository.save(newUser);
                 });
 
-        String repo = req.getRepoName();
+        String repo = req.getRepoName().trim();
         String githubToken = req.getToken();
 
         ObjectMapper mapper = new ObjectMapper();
@@ -55,11 +62,23 @@ public class AnalysisService {
         String openPrJson = GithubService.fetchPRs(repo, githubToken);
         JsonNode openRoot = mapper.readTree(openPrJson);
 
+        if (!openRoot.isArray()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Unexpected GitHub PR response: " + extractGithubError(openRoot)
+            );
+        }
+
         int totalOpenPRs = openRoot.size();
         int stalePRs = 0;
 
         for (JsonNode pr : openRoot) {
-            String createdAt = pr.get("created_at").asText();
+            JsonNode createdAtNode = pr.get("created_at");
+            if (createdAtNode == null || createdAtNode.isNull()) {
+                continue;
+            }
+
+            String createdAt = createdAtNode.asText();
             OffsetDateTime createdDate = OffsetDateTime.parse(createdAt);
 
             if (createdDate.isBefore(
@@ -71,11 +90,19 @@ public class AnalysisService {
         String closedPrJson = GithubService.fetchClosedPRs(repo, githubToken);
         JsonNode closedRoot = mapper.readTree(closedPrJson);
 
+        if (!closedRoot.isArray()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Unexpected GitHub closed PR response: " + extractGithubError(closedRoot)
+            );
+        }
+
         int closedPRs = closedRoot.size();
         int mergedPRs = 0;
 
         for (JsonNode pr : closedRoot) {
-            if (!pr.get("merged_at").isNull()) {
+            JsonNode mergedAtNode = pr.get("merged_at");
+            if (mergedAtNode != null && !mergedAtNode.isNull()) {
                 mergedPRs++;
             }
         }
@@ -112,7 +139,7 @@ public class AnalysisService {
 
     public java.util.List<RepoAnalysis> getUserHistory(String authHeader) throws Exception {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Missing or invalid Authorization header");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
         }
 
         String googleToken = authHeader.replace("Bearer ", "");
@@ -122,5 +149,13 @@ public class AnalysisService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return report.findByUserOrderByAnalyzedAtDesc(user);
+    }
+
+    private static String extractGithubError(JsonNode root) {
+        JsonNode messageNode = root.get("message");
+        if (messageNode != null && !messageNode.isNull()) {
+            return messageNode.asText();
+        }
+        return root.toString();
     }
 }

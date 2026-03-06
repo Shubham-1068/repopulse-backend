@@ -3,7 +3,9 @@ package com.repopulse.repopulse.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -46,9 +48,24 @@ public class GithubService {
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<String> response =
+        try {
+            ResponseEntity<String> response =
                 restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
-        return response.getBody();
+            return response.getBody();
+        } catch (HttpStatusCodeException ex) {
+            String message = ex.getResponseBodyAsString();
+            throw new ResponseStatusException(
+                ex.getStatusCode(),
+                "GitHub API request failed: " + message,
+                ex
+            );
+        } catch (Exception ex) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Unable to reach GitHub API",
+                ex
+            );
+        }
     }
 }
