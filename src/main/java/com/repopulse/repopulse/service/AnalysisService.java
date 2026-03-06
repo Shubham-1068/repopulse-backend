@@ -109,4 +109,18 @@ public class AnalysisService {
 
         return report.save(analysis);
     }
+
+    public java.util.List<RepoAnalysis> getUserHistory(String authHeader) throws Exception {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Missing or invalid Authorization header");
+        }
+
+        String googleToken = authHeader.replace("Bearer ", "");
+        String email = googleAuthService.verify(googleToken);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return report.findByUserOrderByAnalyzedAtDesc(user);
+    }
 }
