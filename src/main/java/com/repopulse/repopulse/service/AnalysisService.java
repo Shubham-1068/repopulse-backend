@@ -44,7 +44,7 @@ public class AnalysisService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "repoName is required");
         }
 
-        String googleToken = authHeader.replace("Bearer ", "");
+        String googleToken = authHeader.substring(7);
         String email = googleAuthService.verify(googleToken);
 
         User user = userRepository.findByEmail(email)
@@ -55,7 +55,11 @@ public class AnalysisService {
                 });
 
         String repo = req.getRepoName().trim();
+
         String githubToken = req.getToken();
+        if (githubToken == null || githubToken.isBlank()) {
+            githubToken = System.getenv("GITHUB_TOKEN");
+        }
 
         ObjectMapper mapper = new ObjectMapper();
 
@@ -92,8 +96,8 @@ public class AnalysisService {
 
         if (!closedRoot.isArray()) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_GATEWAY,
-                "Unexpected GitHub closed PR response: " + extractGithubError(closedRoot)
+                    HttpStatus.BAD_GATEWAY,
+                    "Unexpected GitHub closed PR response: " + extractGithubError(closedRoot)
             );
         }
 
@@ -138,11 +142,12 @@ public class AnalysisService {
     }
 
     public java.util.List<RepoAnalysis> getUserHistory(String authHeader) throws Exception {
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
         }
 
-        String googleToken = authHeader.replace("Bearer ", "");
+        String googleToken = authHeader.substring(7);
         String email = googleAuthService.verify(googleToken);
 
         User user = userRepository.findByEmail(email)

@@ -10,12 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class GithubService {
-    private static final RestTemplate restTemplate = new RestTemplate();
 
-//    public static String fetchPRs(String repo, String token) {
-//        String url = "https://api.github.com/repos/" + repo + "/pulls?state=open";
-//        return callGithub(url, token);
-//    }
+    private static final RestTemplate restTemplate = new RestTemplate();
 
     public static String fetchPRs(String repo, String token) {
         String url = "https://api.github.com/repos/" + repo + "/pulls?state=open";
@@ -52,28 +48,31 @@ public class GithubService {
 
         try {
             ResponseEntity<String> response =
-                restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+                    restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
             return response.getBody();
+
         } catch (HttpStatusCodeException ex) {
+
             String message = ex.getResponseBodyAsString();
             String reason = "GitHub API request failed: " + message;
 
-            if (ex.getStatusCode().value() == 403 && (token == null || token.isBlank())) {
-            reason = "GitHub API returned 403 (likely rate limit for unauthenticated requests). " +
-                "Provide a GitHub token in the request token field. Upstream: " + message;
+            if (ex.getStatusCode().value() == 403) {
+                reason = "GitHub API rate limit exceeded or access denied. Upstream: " + message;
             }
 
             throw new ResponseStatusException(
-                ex.getStatusCode(),
-                reason,
-                ex
+                    ex.getStatusCode(),
+                    reason,
+                    ex
             );
+
         } catch (Exception ex) {
+
             throw new ResponseStatusException(
-                HttpStatus.BAD_GATEWAY,
-                "Unable to reach GitHub API",
-                ex
+                    HttpStatus.BAD_GATEWAY,
+                    "Unable to reach GitHub API",
+                    ex
             );
         }
     }
